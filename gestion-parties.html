@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Festival 2K27 — Gestion des parties</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕹️</text></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg: #0a0a14;
+    --bg-alt: #10101c;
+    --card: #14141f;
+    --card-hover: #191926;
+    --neon-purple: #b026ff;
+    --neon-cyan: #22e8ff;
+    --neon-pink: #ff2e88;
+    --neon-green: #2bff88;
+    --neon-orange: #ffb020;
+    --text: #e8e8f5;
+    --text-dim: #9494b0;
+    --border: rgba(255,255,255,0.1);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html{ scroll-behavior: smooth; }
+
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, .logo{ font-family: 'Orbitron', sans-serif; }
+
+  body::before{
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(176,38,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(176,38,255,0.06) 1px, transparent 1px);
+    background-size: 45px 45px;
+    z-index: -2;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  body::after{
+    content:"";
+    position: fixed;
+    inset:0;
+    background: radial-gradient(circle at 15% 20%, rgba(176,38,255,0.15), transparent 45%),
+                radial-gradient(circle at 85% 75%, rgba(34,232,255,0.12), transparent 45%);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  ::selection{ background: var(--neon-purple); color: #fff; }
+
+  ::-webkit-scrollbar{ width: 10px; }
+  ::-webkit-scrollbar-track{ background: var(--bg); }
+  ::-webkit-scrollbar-thumb{
+    background: linear-gradient(var(--neon-purple), var(--neon-cyan));
+    border-radius: 10px;
+  }
+
+  header{
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 18px 5%;
+    background: rgba(10,10,20,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo{
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    white-space: nowrap;
+  }
+
+  .header-actions{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .badge-connexion{
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(148,148,176,0.15);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .badge-connexion.connecte{ background: rgba(43,255,136,0.15); color: var(--neon-green); }
+  .badge-connexion.solo{ background: rgba(255,176,32,0.15); color: var(--neon-orange); }
+  .badge-connexion.erreur{ background: rgba(255,46,136,0.15); color: var(--neon-pink); }
+
+  button{
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 8px;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  button:hover{ transform: translateY(-1px); border-color: var(--neon-cyan); }
+  button:active{ transform: translateY(0); }
+
+  button.primary{
+    background: linear-gradient(90deg, var(--neon-purple), var(--neon-cyan));
+    color: #04040a;
+    border: none;
+    font-weight: 700;
+  }
+  button.pause-globale{
+    border-color: var(--neon-orange);
+    color: var(--neon-orange);
+  }
+  button.pause-globale.active{
+    background: var(--neon-orange);
+    color: #04040a;
+    box-shadow: 0 0 18px rgba(255,176,32,0.5);
+  }
+  button.danger{ border-color: var(--neon-pink); color: var(--neon-pink); }
+  button.small{ padding: 6px 12px; font-size: 0.85rem; }
+  button:disabled{ opacity: 0.4; cursor: not-allowed; transform:none; }
+
+  input[type="text"], input[type="number"], select{
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    width: 100%;
+  }
+  input:focus, select:focus{ outline: none; border-color: var(--neon-cyan); }
+
+  main{
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 5% 100px;
+  }
+
+  section{ margin-bottom: 50px; }
+
+  section > h2{
+    font-size: 1.3rem;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section > h2 .compte{
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+  }
+
+  .grille-postes{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .poste{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .poste.statut-encours{ border-color: rgba(34,232,255,0.5); box-shadow: 0 0 20px rgba(34,232,255,0.12); }
+  .poste.statut-pause{ border-color: rgba(255,176,32,0.5); box-shadow: 0 0 20px rgba(255,176,32,0.1); }
+
+  .poste-entete{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .poste-nom{
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    width: auto;
+    flex: 1;
+    padding: 4px 2px;
+  }
+  .poste-nom:focus{ outline: none; border-bottom: 1px solid var(--neon-cyan); }
+
+  .badge{
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge.libre{ background: rgba(148,148,176,0.15); color: var(--text-dim); }
+  .badge.encours{ background: rgba(34,232,255,0.15); color: var(--neon-cyan); }
+  .badge.pause{ background: rgba(255,176,32,0.15); color: var(--neon-orange); }
+
+  .poste .chrono{
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.8rem;
+    text-align: center;
+    letter-spacing: 2px;
+    padding: 6px 0;
+  }
+  .poste.statut-encours .chrono{ color: var(--neon-cyan); }
+  .poste.statut-pause .chrono{ color: var(--neon-orange); }
+
+  .poste .infos{
+    font-size: 0.9rem;
+    color: var(--text-dim);
+  }
+  .poste .infos strong{ color: var(--text); }
+
+  .poste-form{ display: flex; flex-direction: column; gap: 8px; }
+  .poste-form label{ font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .poste-actions{ display: flex; gap: 8px; flex-wrap: wrap; }
+  .poste-actions button{ flex: 1; min-width: 90px; }
+
+  .poste-pied{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .poste-ecran{
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
+  .poste-ecran:hover{ color: var(--neon-orange); border-color: var(--neon-orange); }
+  .poste-suppr{
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 2px 6px;
+    font-size: 0.9rem;
+  }
+  .poste-suppr:hover{ color: var(--neon-pink); border: none; }
+
+  .carte-ajout{
+    background: transparent;
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: var(--text-dim);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .carte-ajout:hover{ border-color: var(--neon-cyan); color: var(--neon-cyan); }
+
+  .historique-liste{ display: flex; flex-direction: column; gap: 10px; }
+  .historique-item{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .historique-item .detail{ display: flex; flex-direction: column; gap: 2px; }
+  .historique-item .detail .titre{ font-weight: 700; }
+  .historique-item .detail .sous{ font-size: 0.85rem; color: var(--text-dim); }
+  .historique-item .resultat{
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    color: var(--neon-green);
+    text-align: right;
+  }
+  .historique-item .duree{ font-size: 0.8rem; color: var(--text-dim); }
+
+  .vide{ color: var(--text-dim); font-style: italic; padding: 20px 0; }
+
+  .overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(4,4,10,0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  .overlay.cache{ display: none; }
+  .modale{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px;
+    max-width: 400px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .modale h3{ font-size: 1.1rem; }
+  .modale-actions{ display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+  footer{
+    text-align: center;
+    padding: 24px 5% 40px;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  #fichier-import{ display: none; }
+
+  @media (max-width: 560px){
+    .logo{ font-size: 1.15rem; }
+    header{ padding: 14px 4%; }
+    main{ padding: 28px 4% 80px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🕹️ FESTIVAL 2K27</div>
+  <div class="header-actions">
+    <span id="badge-connexion" class="badge-connexion">● Chargement…</span>
+    <button id="btn-pause-globale" class="pause-globale" title="Met en pause tous les postes en cours (annonces, etc.)">⏸ Pause annonce</button>
+    <button id="btn-export" title="Sauvegarder les données dans un fichier">⬇ Exporter</button>
+    <button id="btn-import" title="Recharger des données depuis un fichier">⬆ Importer</button>
+    <input type="file" id="fichier-import" accept="application/json">
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>Postes de jeu <span class="compte" id="compte-postes"></span></h2>
+    <div class="grille-postes" id="grille-postes"></div>
+  </section>
+
+  <section>
+    <h2>Historique des parties <span class="compte" id="compte-historique"></span></h2>
+    <div class="historique-liste" id="historique-liste"></div>
+  </section>
+</main>
+
+<footer>Festival 2K27 — outil de gestion des parties, données stockées sur cet appareil.</footer>
+
+<div class="overlay cache" id="overlay-terminer">
+  <div class="modale">
+    <h3>Terminer la partie</h3>
+    <div class="poste-form">
+      <label for="modale-resultat">Résultat / gagnant</label>
+      <input type="text" id="modale-resultat" placeholder="Ex : Alice gagne 3-1">
+    </div>
+    <div class="modale-actions">
+      <button id="modale-annuler">Annuler</button>
+      <button id="modale-valider" class="primary">Valider</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+(function(){
+  const CLE_STOCKAGE = 'festival2k27_parties';
+  const JEUX_DISPONIBLES = ['World of Padman', 'Trackmania'];
+
+  // ↓↓↓ Pour connecter plusieurs appareils entre eux : crée un projet Firebase gratuit
+  // (console.firebase.google.com), active "Realtime Database", et colle ici la config
+  // "firebaseConfig" fournie par Firebase (Paramètres du projet > Vos applications > Web).
+  // Tant que apiKey vaut "COLLE_TA_CLE_ICI", l'outil reste en mode solo (un seul appareil).
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCFd2YAtKt8efLtsQIeyvCr0B8rVBs7VZ0",
+    authDomain: "festival2k27.firebaseapp.com",
+    databaseURL: "https://festival2k27-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "festival2k27"
+  };
+  const FIREBASE_ACTIF = FIREBASE_CONFIG.apiKey !== "COLLE_TA_CLE_ICI";
+  let firebaseRef = null;
+
+  function idUnique(prefixe){
+    return prefixe + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+  }
+
+  function etatParDefaut(){
+    return {
+      postes: [1,2,3,4].map(n => ({
+        id: idUnique('poste'),
+        nom: 'Poste ' + n,
+        jeu: '',
+        joueurs: '',
+        statut: 'libre',
+        debut: null,
+        pausedMs: 0,
+        pauseDepuis: null
+      })),
+      historique: [],
+      globalPauseActive: false,
+      globalPausedIds: []
+    };
+  }
+
+  function chargerEtatLocal(){
+    try{
+      const brut = localStorage.getItem(CLE_STOCKAGE);
+      if (!brut) return etatParDefaut();
+      const donnees = JSON.parse(brut);
+      if (!donnees.postes || !donnees.historique) return etatParDefaut();
+      return donnees;
+    }catch(e){
+      return etatParDefaut();
+    }
+  }
+
+  let etat = null;
+  let posteEnAttenteFin = null;
+
+  function majBadgeConnexion(statut){
+    const badge = document.getElementById('badge-connexion');
+    if (statut === 'connecte'){
+      badge.textContent = '● Connecté (partagé)';
+      badge.className = 'badge-connexion connecte';
+    } else if (statut === 'erreur'){
+      badge.textContent = '● Connexion impossible';
+      badge.className = 'badge-connexion erreur';
+    } else {
+      badge.textContent = '● Solo (cet appareil)';
+      badge.className = 'badge-connexion solo';
+    }
+  }
+
+  function initEtat(){
+    if (FIREBASE_ACTIF){
+      firebase.initializeApp(FIREBASE_CONFIG);
+      firebaseRef = firebase.database().ref('festival2k27_etat');
+      firebaseRef.on('value', snapshot => {
+        const donnees = snapshot.val();
+        if (!donnees || !donnees.postes){
+          etat = etatParDefaut();
+          firebaseRef.set(etat);
+        } else {
+          etat = donnees;
+        }
+        majBadgeConnexion('connecte');
+        render();
+      }, erreur => {
+        console.error(erreur);
+        if (!etat) etat = chargerEtatLocal();
+        majBadgeConnexion('erreur');
+        render();
+      });
+    } else {
+      etat = chargerEtatLocal();
+      majBadgeConnexion('solo');
+      render();
+    }
+  }
+
+  function sauvegarder(){
+    if (FIREBASE_ACTIF && firebaseRef){
+      firebaseRef.set(etat);
+    } else {
+      localStorage.setItem(CLE_STOCKAGE, JSON.stringify(etat));
+    }
+  }
+
+  function formatDuree(ms){
+    const secondesTotales = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(secondesTotales / 3600);
+    const m = Math.floor((secondesTotales % 3600) / 60);
+    const s = secondesTotales % 60;
+    const deux = n => String(n).padStart(2, '0');
+    return h > 0 ? `${deux(h)}:${deux(m)}:${deux(s)}` : `${deux(m)}:${deux(s)}`;
+  }
+
+  function elapsedPoste(poste){
+    if (poste.statut === 'libre' || !poste.debut) return 0;
+    const reference = poste.statut === 'pause' ? poste.pauseDepuis : Date.now();
+    return reference - poste.debut - poste.pausedMs;
+  }
+
+  function trouverPoste(id){
+    return etat.postes.find(p => p.id === id);
+  }
+
+  function demarrerPartie(id, jeu, joueurs){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    poste.jeu = jeu.trim();
+    poste.joueurs = joueurs.trim();
+    poste.statut = 'encours';
+    poste.debut = Date.now();
+    poste.pausedMs = 0;
+    poste.pauseDepuis = null;
+    sauvegarder();
+    render();
+  }
+
+  function togglePause(id){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    if (poste.statut === 'encours'){
+      poste.statut = 'pause';
+      poste.pauseDepuis = Date.now();
+    } else if (poste.statut === 'pause'){
+      poste.pausedMs += Date.now() - poste.pauseDepuis;
+      poste.pauseDepuis = null;
+      poste.statut = 'encours';
+    }
+    sauvegarder();
+    render();
+  }
+
+  function ouvrirModaleFin(id){
+    posteEnAttenteFin = id;
+    document.getElementById('modale-resultat').value = '';
+    document.getElementById('overlay-terminer').classList.remove('cache');
+    document.getElementById('modale-resultat').focus();
+  }
+
+  function fermerModaleFin(){
+    posteEnAttenteFin = null;
+    document.getElementById('overlay-terminer').classList.add('cache');
+  }
+
+  function terminerPartie(id, resultat){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    const dureeMs = elapsedPoste(poste);
+    etat.historique.unshift({
+      id: idUnique('hist'),
+      poste: poste.nom,
+      jeu: poste.jeu,
+      joueurs: poste.joueurs,
+      fin: Date.now(),
+      dureeMs: dureeMs,
+      resultat: resultat.trim() || '—'
+    });
+    poste.statut = 'libre';
+    poste.jeu = '';
+    poste.joueurs = '';
+    poste.debut = null;
+    poste.pausedMs = 0;
+    poste.pauseDepuis = null;
+    etat.globalPausedIds = etat.globalPausedIds.filter(pid => pid !== id);
+    sauvegarder();
+    render();
+  }
+
+  function supprimerHistorique(id){
+    etat.historique = etat.historique.filter(h => h.id !== id);
+    sauvegarder();
+    render();
+  }
+
+  function ajouterPoste(){
+    const numero = etat.postes.length + 1;
+    etat.postes.push({
+      id: idUnique('poste'),
+      nom: 'Poste ' + numero,
+      jeu: '',
+      joueurs: '',
+      statut: 'libre',
+      debut: null,
+      pausedMs: 0,
+      pauseDepuis: null
+    });
+    sauvegarder();
+    render();
+  }
+
+  function supprimerPoste(id){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    if (poste.statut !== 'libre' && !confirm('Ce poste a une partie en cours. La supprimer sans l\'enregistrer dans l\'historique ?')){
+      return;
+    }
+    etat.postes = etat.postes.filter(p => p.id !== id);
+    etat.globalPausedIds = etat.globalPausedIds.filter(pid => pid !== id);
+    sauvegarder();
+    render();
+  }
+
+  function renommerPoste(id, nom){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    poste.nom = nom.trim() || poste.nom;
+    sauvegarder();
+  }
+
+  function togglePauseGlobale(){
+    if (!etat.globalPauseActive){
+      etat.globalPausedIds = etat.postes.filter(p => p.statut === 'encours').map(p => p.id);
+      etat.globalPausedIds.forEach(id => {
+        const poste = trouverPoste(id);
+        poste.statut = 'pause';
+        poste.pauseDepuis = Date.now();
+      });
+      etat.globalPauseActive = true;
+    } else {
+      etat.globalPausedIds.forEach(id => {
+        const poste = trouverPoste(id);
+        if (poste && poste.statut === 'pause'){
+          poste.pausedMs += Date.now() - poste.pauseDepuis;
+          poste.pauseDepuis = null;
+          poste.statut = 'encours';
+        }
+      });
+      etat.globalPausedIds = [];
+      etat.globalPauseActive = false;
+    }
+    sauvegarder();
+    render();
+  }
+
+  function exporterDonnees(){
+    const blob = new Blob([JSON.stringify(etat, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href = url;
+    a.download = `festival2k27-parties-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function importerDonnees(fichier){
+    const lecteur = new FileReader();
+    lecteur.onload = e => {
+      try{
+        const donnees = JSON.parse(e.target.result);
+        if (!donnees.postes || !donnees.historique) throw new Error('format invalide');
+        if (!confirm('Remplacer les données actuelles par celles du fichier importé ?')) return;
+        etat = donnees;
+        etat.globalPauseActive = etat.globalPauseActive || false;
+        etat.globalPausedIds = etat.globalPausedIds || [];
+        sauvegarder();
+        render();
+      }catch(err){
+        alert("Ce fichier n'est pas un export valide de cet outil.");
+      }
+    };
+    lecteur.readAsText(fichier);
+  }
+
+  function creerCartePoste(poste){
+    const div = document.createElement('div');
+    div.className = 'poste statut-' + poste.statut;
+
+    const badgeTxt = poste.statut === 'libre' ? 'Libre' : poste.statut === 'encours' ? 'En cours' : 'En pause';
+
+    let contenuAction = '';
+    if (poste.statut === 'libre'){
+      const optionsJeu = JEUX_DISPONIBLES.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
+      contenuAction = `
+        <div class="poste-form">
+          <label>Jeu</label>
+          <select class="champ-jeu">
+            <option value="">-- Choisir --</option>
+            ${optionsJeu}
+            <option value="Autre">Autre...</option>
+          </select>
+          <input type="text" class="champ-jeu-autre" placeholder="Précise le jeu" style="display:none;">
+          <label>Joueur(s)</label>
+          <input type="text" class="champ-joueurs" placeholder="Ex : Alice, Bob">
+        </div>
+        <div class="poste-actions">
+          <button class="primary btn-demarrer">▶ Démarrer</button>
+        </div>
+      `;
+    } else {
+      contenuAction = `
+        <div class="chrono">${formatDuree(elapsedPoste(poste))}</div>
+        <div class="infos">
+          <strong>${poste.jeu || 'Jeu non précisé'}</strong><br>
+          ${poste.joueurs || 'Joueur(s) non précisé(s)'}
+        </div>
+        <div class="poste-actions">
+          <button class="btn-pause">${poste.statut === 'pause' ? '▶ Reprendre' : '⏸ Pause'}</button>
+          <button class="primary btn-terminer">🏁 Terminer</button>
+        </div>
+      `;
+    }
+
+    div.innerHTML = `
+      <div class="poste-entete">
+        <input type="text" class="poste-nom champ-nom" value="${escapeHtml(poste.nom)}">
+        <span class="badge ${poste.statut}">${badgeTxt}</span>
+      </div>
+      ${contenuAction}
+      <div class="poste-pied">
+        <button class="poste-ecran" title="Ouvrir l'écran de pause de ce poste (à afficher sur son PC)">🔒 Écran</button>
+        <button class="poste-suppr" title="Supprimer ce poste">🗑</button>
+      </div>
+    `;
+
+    div.querySelector('.champ-nom').addEventListener('change', e => renommerPoste(poste.id, e.target.value));
+    div.querySelector('.poste-suppr').addEventListener('click', () => supprimerPoste(poste.id));
+    div.querySelector('.poste-ecran').addEventListener('click', () => {
+      window.open('verrouillage.html?poste=' + encodeURIComponent(poste.nom), '_blank');
+    });
+
+    if (poste.statut === 'libre'){
+      const champJeu = div.querySelector('.champ-jeu');
+      const champJeuAutre = div.querySelector('.champ-jeu-autre');
+      champJeu.addEventListener('change', () => {
+        champJeuAutre.style.display = champJeu.value === 'Autre' ? 'block' : 'none';
+        if (champJeu.value === 'Autre') champJeuAutre.focus();
+      });
+      div.querySelector('.btn-demarrer').addEventListener('click', () => {
+        const jeu = champJeu.value === 'Autre' ? champJeuAutre.value : champJeu.value;
+        const joueurs = div.querySelector('.champ-joueurs').value;
+        demarrerPartie(poste.id, jeu, joueurs);
+      });
+    } else {
+      div.querySelector('.btn-pause').addEventListener('click', () => togglePause(poste.id));
+      div.querySelector('.btn-terminer').addEventListener('click', () => ouvrirModaleFin(poste.id));
+    }
+
+    return div;
+  }
+
+  function escapeHtml(txt){
+    const d = document.createElement('div');
+    d.textContent = txt;
+    return d.innerHTML;
+  }
+
+  function render(){
+    if (!etat) return;
+    const grille = document.getElementById('grille-postes');
+    grille.innerHTML = '';
+    etat.postes.forEach(poste => grille.appendChild(creerCartePoste(poste)));
+
+    const carteAjout = document.createElement('div');
+    carteAjout.className = 'carte-ajout';
+    carteAjout.textContent = '+ Ajouter un poste';
+    carteAjout.addEventListener('click', ajouterPoste);
+    grille.appendChild(carteAjout);
+
+    document.getElementById('compte-postes').textContent =
+      `(${etat.postes.filter(p => p.statut !== 'libre').length} occupé(s) / ${etat.postes.length})`;
+
+    const listeHist = document.getElementById('historique-liste');
+    listeHist.innerHTML = '';
+    if (etat.historique.length === 0){
+      listeHist.innerHTML = '<div class="vide">Aucune partie terminée pour le moment.</div>';
+    } else {
+      etat.historique.forEach(h => {
+        const item = document.createElement('div');
+        item.className = 'historique-item';
+        const heureFin = new Date(h.fin).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        item.innerHTML = `
+          <div class="detail">
+            <span class="titre">${escapeHtml(h.jeu || 'Jeu non précisé')} — ${escapeHtml(h.poste)}</span>
+            <span class="sous">${escapeHtml(h.joueurs || 'Joueur(s) non précisé(s)')} · fini à ${heureFin}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div>
+              <div class="resultat">${escapeHtml(h.resultat)}</div>
+              <div class="duree">${formatDuree(h.dureeMs)}</div>
+            </div>
+            <button class="small danger btn-suppr-hist" title="Supprimer cette entrée">🗑</button>
+          </div>
+        `;
+        item.querySelector('.btn-suppr-hist').addEventListener('click', () => supprimerHistorique(h.id));
+        listeHist.appendChild(item);
+      });
+    }
+    document.getElementById('compte-historique').textContent = `(${etat.historique.length})`;
+
+    const btnPauseGlobale = document.getElementById('btn-pause-globale');
+    btnPauseGlobale.textContent = etat.globalPauseActive ? '▶ Reprendre tout' : '⏸ Pause annonce';
+    btnPauseGlobale.classList.toggle('active', etat.globalPauseActive);
+    const yAPartiesEnCours = etat.postes.some(p => p.statut === 'encours' || p.statut === 'pause');
+    btnPauseGlobale.disabled = !etat.globalPauseActive && !etat.postes.some(p => p.statut === 'encours');
+  }
+
+  document.getElementById('btn-pause-globale').addEventListener('click', togglePauseGlobale);
+  document.getElementById('btn-export').addEventListener('click', exporterDonnees);
+  document.getElementById('btn-import').addEventListener('click', () => document.getElementById('fichier-import').click());
+  document.getElementById('fichier-import').addEventListener('change', e => {
+    if (e.target.files[0]) importerDonnees(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('modale-annuler').addEventListener('click', fermerModaleFin);
+  document.getElementById('modale-valider').addEventListener('click', () => {
+    if (posteEnAttenteFin){
+      terminerPartie(posteEnAttenteFin, document.getElementById('modale-resultat').value);
+    }
+    fermerModaleFin();
+  });
+  document.getElementById('modale-resultat').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('modale-valider').click();
+  });
+
+  setInterval(() => {
+    if (!etat) return;
+    document.querySelectorAll('.poste:not(.statut-libre) .chrono').forEach((el, i) => {
+      const postesActifs = etat.postes.filter(p => p.statut !== 'libre');
+      const poste = postesActifs[i];
+      if (poste) el.textContent = formatDuree(elapsedPoste(poste));
+    });
+  }, 1000);
+
+  initEtat();
+})();
+</script>
+
+</body>
+</html>

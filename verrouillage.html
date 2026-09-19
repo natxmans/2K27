@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Écran de pause — Festival 2K27</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏸️</text></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+  :root{
+    --bg: #0a0a14;
+    --neon-cyan: #22e8ff;
+    --neon-orange: #ffb020;
+    --neon-pink: #ff2e88;
+    --text: #e8e8f5;
+    --text-dim: #9494b0;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html, body{
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+  }
+
+  #app{
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .overlay-pause{
+    position: fixed;
+    inset: 0;
+    background: #04040a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    z-index: 10;
+  }
+
+  .icone{
+    font-size: 7rem;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse{
+    0%, 100%{ opacity: 0.6; transform: scale(1); }
+    50%{ opacity: 1; transform: scale(1.08); }
+  }
+
+  h1{
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--neon-orange);
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .sous{
+    font-size: clamp(1.1rem, 3vw, 1.6rem);
+    color: var(--text-dim);
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  .nom-poste{
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .etat-neutre{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .etat-neutre .statut{
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    color: var(--neon-cyan);
+    letter-spacing: 2px;
+  }
+  .etat-neutre .nom{
+    font-size: 1.1rem;
+    color: var(--text-dim);
+  }
+
+  .erreur{
+    max-width: 500px;
+    text-align: center;
+    color: var(--neon-pink);
+    font-size: 1.2rem;
+    padding: 0 20px;
+  }
+
+  .barre-bas{
+    position: fixed;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 20;
+  }
+
+  button{
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(20,20,31,0.8);
+    color: var(--text-dim);
+    padding: 8px 14px;
+    border-radius: 8px;
+  }
+  button:hover{ color: var(--text); border-color: var(--neon-cyan); }
+
+  .rappel{
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<div class="barre-bas">
+  <button id="btn-plein-ecran">⛶ Plein écran</button>
+  <span class="rappel">Laisse cette fenêtre au premier plan sur ce poste</span>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+(function(){
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCFd2YAtKt8efLtsQIeyvCr0B8rVBs7VZ0",
+    authDomain: "festival2k27.firebaseapp.com",
+    databaseURL: "https://festival2k27-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "festival2k27"
+  };
+
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(location.search);
+  const nomPoste = (params.get('poste') || '').trim();
+
+  function escapeHtml(txt){
+    const d = document.createElement('div');
+    d.textContent = txt;
+    return d.innerHTML;
+  }
+
+  function afficherErreur(message){
+    app.innerHTML = `<div class="erreur">${escapeHtml(message)}</div>`;
+  }
+
+  function render(poste){
+    if (!poste){
+      afficherErreur(`Poste "${nomPoste}" introuvable. Vérifie l'orthographe dans le lien (?poste=...) — elle doit correspondre exactement au nom du poste dans l'outil de gestion.`);
+      return;
+    }
+    if (poste.statut === 'pause'){
+      app.innerHTML = `
+        <div class="nom-poste">${escapeHtml(poste.nom)}</div>
+        <div class="overlay-pause">
+          <div class="icone">⏸</div>
+          <h1>Pause</h1>
+          <div class="sous">Annonce en cours — merci de patienter</div>
+        </div>
+      `;
+    } else {
+      app.innerHTML = `
+        <div class="nom-poste">${escapeHtml(poste.nom)}</div>
+        <div class="etat-neutre">
+          <div class="statut">${poste.statut === 'libre' ? 'LIBRE' : 'EN COURS'}</div>
+          <div class="nom">${escapeHtml(poste.jeu || '')}</div>
+        </div>
+      `;
+    }
+  }
+
+  if (!nomPoste){
+    afficherErreur('Ajoute le nom du poste dans le lien, par exemple : verrouillage.html?poste=PC%201');
+  } else {
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      const refPostes = firebase.database().ref('festival2k27_etat/postes');
+      refPostes.on('value', snapshot => {
+        const donnees = snapshot.val() || [];
+        const postes = Array.isArray(donnees) ? donnees : Object.values(donnees);
+        const poste = postes.find(p => p && p.nom && p.nom.trim().toLowerCase() === nomPoste.toLowerCase());
+        render(poste);
+      }, erreur => {
+        afficherErreur('Connexion impossible : ' + erreur.message);
+      });
+    }catch(e){
+      afficherErreur('Erreur de configuration Firebase : ' + e.message);
+    }
+  }
+
+  document.getElementById('btn-plein-ecran').addEventListener('click', () => {
+    document.documentElement.requestFullscreen().catch(() => {});
+  });
+})();
+</script>
+
+</body>
+</html>
