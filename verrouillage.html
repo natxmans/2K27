@@ -180,13 +180,16 @@
       afficherErreur(`Poste "${nomPoste}" introuvable. Vérifie l'orthographe dans le lien (?poste=...) — elle doit correspondre exactement au nom du poste dans l'outil de gestion.`);
       return;
     }
-    if (poste.statut === 'pause'){
+    if (poste.statut === 'pause' || poste.pauseRaison === 'changement'){
+      const sousTitre = poste.pauseRaison === 'changement'
+        ? 'Changement de jeu en cours — merci de patienter'
+        : 'Annonce en cours — merci de patienter';
       app.innerHTML = `
         <div class="nom-poste">${escapeHtml(poste.nom)}</div>
         <div class="overlay-pause">
           <div class="icone">⏸</div>
           <h1>Pause</h1>
-          <div class="sous">Annonce en cours — merci de patienter</div>
+          <div class="sous">${sousTitre}</div>
         </div>
       `;
     } else {

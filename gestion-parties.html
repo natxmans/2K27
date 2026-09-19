@@ -145,6 +145,15 @@
     color: #04040a;
     box-shadow: 0 0 18px rgba(255,176,32,0.5);
   }
+  button.pause-globale.changement{
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+  }
+  button.pause-globale.changement.active{
+    background: var(--neon-pink);
+    color: #04040a;
+    box-shadow: 0 0 18px rgba(255,46,136,0.5);
+  }
   button.danger{ border-color: var(--neon-pink); color: var(--neon-pink); }
   button.small{ padding: 6px 12px; font-size: 0.85rem; }
   button:disabled{ opacity: 0.4; cursor: not-allowed; transform:none; }
@@ -253,6 +262,28 @@
 
   .poste-form{ display: flex; flex-direction: column; gap: 8px; }
   .poste-form label{ font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .avis-verrou-pc{
+    background: rgba(255,46,136,0.1);
+    border: 1px solid rgba(255,46,136,0.4);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    color: var(--neon-pink);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .lien-debloquer-pc{
+    align-self: flex-start;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    text-decoration: underline;
+    padding: 0;
+    font-size: 0.75rem;
+  }
+  .lien-debloquer-pc:hover{ color: var(--neon-pink); }
 
   .poste-actions{ display: flex; gap: 8px; flex-wrap: wrap; }
   .poste-actions button{ flex: 1; min-width: 90px; }
@@ -367,7 +398,8 @@
   <div class="logo">🕹️ FESTIVAL 2K27</div>
   <div class="header-actions">
     <span id="badge-connexion" class="badge-connexion">● Chargement…</span>
-    <button id="btn-pause-globale" class="pause-globale" title="Met en pause tous les postes en cours (annonces, etc.)">⏸ Pause annonce</button>
+    <button id="btn-pause-annonce" class="pause-globale" title="Met en pause tous les postes en cours pour une annonce">⏸ Pause annonce</button>
+    <button id="btn-changement-jeu" class="pause-globale changement" title="Termine toutes les parties en cours et verrouille les postes pendant le changement">🏁 Tout terminer</button>
     <button id="btn-export" title="Sauvegarder les données dans un fichier">⬇ Exporter</button>
     <button id="btn-import" title="Recharger des données depuis un fichier">⬆ Importer</button>
     <input type="file" id="fichier-import" accept="application/json">
@@ -390,7 +422,7 @@
 
 <div class="overlay cache" id="overlay-terminer">
   <div class="modale">
-    <h3>Terminer la partie</h3>
+    <h3 id="modale-titre">Terminer la partie</h3>
     <div class="poste-form">
       <label for="modale-resultat">Résultat / gagnant</label>
       <input type="text" id="modale-resultat" placeholder="Ex : Alice gagne 3-1">
@@ -436,7 +468,8 @@
         statut: 'libre',
         debut: null,
         pausedMs: 0,
-        pauseDepuis: null
+        pauseDepuis: null,
+        pauseRaison: null
       })),
       historique: [],
       globalPauseActive: false,
@@ -484,6 +517,12 @@
           firebaseRef.set(etat);
         } else {
           etat = donnees;
+          // Firebase supprime les tableaux/valeurs vides (ex: historique: []) : on
+          // remet des valeurs par defaut pour ces champs s'ils sont absents du snapshot.
+          etat.historique = etat.historique || [];
+          etat.globalPauseActive = etat.globalPauseActive || false;
+          etat.globalPauseRaison = etat.globalPauseRaison || null;
+          etat.globalPausedIds = etat.globalPausedIds || [];
         }
         majBadgeConnexion('connecte');
         render();
@@ -536,6 +575,7 @@
     poste.debut = Date.now();
     poste.pausedMs = 0;
     poste.pauseDepuis = null;
+    poste.pauseRaison = null;
     sauvegarder();
     render();
   }
@@ -546,17 +586,25 @@
     if (poste.statut === 'encours'){
       poste.statut = 'pause';
       poste.pauseDepuis = Date.now();
+      poste.pauseRaison = null;
     } else if (poste.statut === 'pause'){
       poste.pausedMs += Date.now() - poste.pauseDepuis;
       poste.pauseDepuis = null;
       poste.statut = 'encours';
+      poste.pauseRaison = null;
+      etat.globalPausedIds = etat.globalPausedIds.filter(pid => pid !== id);
     }
     sauvegarder();
     render();
   }
 
-  function ouvrirModaleFin(id){
+  function ouvrirModaleFin(id, restantGroupe){
     posteEnAttenteFin = id;
+    const poste = trouverPoste(id);
+    const titre = document.getElementById('modale-titre');
+    titre.textContent = restantGroupe
+      ? `Terminer ${poste ? poste.nom : ''} (reste ${restantGroupe})`
+      : 'Terminer la partie';
     document.getElementById('modale-resultat').value = '';
     document.getElementById('overlay-terminer').classList.remove('cache');
     document.getElementById('modale-resultat').focus();
@@ -564,6 +612,7 @@
 
   function fermerModaleFin(){
     posteEnAttenteFin = null;
+    fileTerminerGroupe = [];
     document.getElementById('overlay-terminer').classList.add('cache');
   }
 
@@ -586,6 +635,7 @@
     poste.debut = null;
     poste.pausedMs = 0;
     poste.pauseDepuis = null;
+    poste.pauseRaison = null;
     etat.globalPausedIds = etat.globalPausedIds.filter(pid => pid !== id);
     sauvegarder();
     render();
@@ -607,7 +657,8 @@
       statut: 'libre',
       debut: null,
       pausedMs: 0,
-      pauseDepuis: null
+      pauseDepuis: null,
+      pauseRaison: null
     });
     sauvegarder();
     render();
@@ -639,6 +690,7 @@
         const poste = trouverPoste(id);
         poste.statut = 'pause';
         poste.pauseDepuis = Date.now();
+        poste.pauseRaison = 'annonce';
       });
       etat.globalPauseActive = true;
     } else {
@@ -648,10 +700,59 @@
           poste.pausedMs += Date.now() - poste.pauseDepuis;
           poste.pauseDepuis = null;
           poste.statut = 'encours';
+          poste.pauseRaison = null;
         }
       });
       etat.globalPausedIds = [];
       etat.globalPauseActive = false;
+    }
+    sauvegarder();
+    render();
+  }
+
+  // "Tout terminer" : demande le resultat de chaque partie active (une modale a la
+  // fois), les cloture dans l'historique, puis remet chaque poste en "libre" (donc
+  // reconfigurable tout de suite sur le site) MAIS garde le PC physique verrouille
+  // ("changement de jeu") jusqu'a ce qu'une nouvelle partie soit demarree dessus.
+  let fileTerminerGroupe = [];
+
+  function lancerToutTerminer(){
+    fileTerminerGroupe = etat.postes.filter(p => p.statut === 'encours' || p.statut === 'pause').map(p => p.id);
+    if (fileTerminerGroupe.length === 0) return;
+    traiterProchainTerminerGroupe();
+  }
+
+  function traiterProchainTerminerGroupe(){
+    if (fileTerminerGroupe.length === 0) return;
+    ouvrirModaleFin(fileTerminerGroupe[0], fileTerminerGroupe.length);
+  }
+
+  function terminerPourChangement(id, resultat){
+    const poste = trouverPoste(id);
+    if (!poste) return;
+    etat.historique.unshift({
+      id: idUnique('hist'),
+      poste: poste.nom,
+      jeu: poste.jeu,
+      joueurs: poste.joueurs,
+      fin: Date.now(),
+      dureeMs: elapsedPoste(poste),
+      resultat: resultat.trim() || '—'
+    });
+    poste.jeu = '';
+    poste.joueurs = '';
+    poste.debut = null;
+    poste.pausedMs = 0;
+    poste.statut = 'libre';
+    poste.pauseDepuis = null;
+    poste.pauseRaison = 'changement';
+    etat.globalPausedIds = etat.globalPausedIds.filter(pid => pid !== id);
+  }
+
+  function debloquerPcPoste(id){
+    const poste = trouverPoste(id);
+    if (poste && poste.pauseRaison === 'changement'){
+      poste.pauseRaison = null;
     }
     sauvegarder();
     render();
@@ -693,12 +794,18 @@
     const div = document.createElement('div');
     div.className = 'poste statut-' + poste.statut;
 
+    const pcVerrouille = poste.statut === 'libre' && poste.pauseRaison === 'changement';
     const badgeTxt = poste.statut === 'libre' ? 'Libre' : poste.statut === 'encours' ? 'En cours' : 'En pause';
 
     let contenuAction = '';
     if (poste.statut === 'libre'){
       const optionsJeu = JEUX_DISPONIBLES.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
       contenuAction = `
+        ${pcVerrouille ? `
+        <div class="avis-verrou-pc">
+          🔒 PC verrouillé (changement de jeu) — se débloque en démarrant une partie
+          <button class="lien-debloquer-pc">Débloquer sans démarrer</button>
+        </div>` : ''}
         <div class="poste-form">
           <label>Jeu</label>
           <select class="champ-jeu">
@@ -747,6 +854,9 @@
     });
 
     if (poste.statut === 'libre'){
+      if (pcVerrouille){
+        div.querySelector('.lien-debloquer-pc').addEventListener('click', () => debloquerPcPoste(poste.id));
+      }
       const champJeu = div.querySelector('.champ-jeu');
       const champJeuAutre = div.querySelector('.champ-jeu-autre');
       champJeu.addEventListener('change', () => {
@@ -815,14 +925,17 @@
     }
     document.getElementById('compte-historique').textContent = `(${etat.historique.length})`;
 
-    const btnPauseGlobale = document.getElementById('btn-pause-globale');
-    btnPauseGlobale.textContent = etat.globalPauseActive ? '▶ Reprendre tout' : '⏸ Pause annonce';
-    btnPauseGlobale.classList.toggle('active', etat.globalPauseActive);
-    const yAPartiesEnCours = etat.postes.some(p => p.statut === 'encours' || p.statut === 'pause');
-    btnPauseGlobale.disabled = !etat.globalPauseActive && !etat.postes.some(p => p.statut === 'encours');
+    const btnPauseAnnonce = document.getElementById('btn-pause-annonce');
+    btnPauseAnnonce.textContent = etat.globalPauseActive ? '▶ Reprendre tout' : '⏸ Pause annonce';
+    btnPauseAnnonce.classList.toggle('active', etat.globalPauseActive);
+    btnPauseAnnonce.disabled = !etat.globalPauseActive && !etat.postes.some(p => p.statut === 'encours');
+
+    const btnChangement = document.getElementById('btn-changement-jeu');
+    btnChangement.disabled = !etat.postes.some(p => p.statut === 'encours' || p.statut === 'pause');
   }
 
-  document.getElementById('btn-pause-globale').addEventListener('click', togglePauseGlobale);
+  document.getElementById('btn-pause-annonce').addEventListener('click', togglePauseGlobale);
+  document.getElementById('btn-changement-jeu').addEventListener('click', lancerToutTerminer);
   document.getElementById('btn-export').addEventListener('click', exporterDonnees);
   document.getElementById('btn-import').addEventListener('click', () => document.getElementById('fichier-import').click());
   document.getElementById('fichier-import').addEventListener('change', e => {
@@ -831,8 +944,20 @@
   });
   document.getElementById('modale-annuler').addEventListener('click', fermerModaleFin);
   document.getElementById('modale-valider').addEventListener('click', () => {
+    const resultat = document.getElementById('modale-resultat').value;
     if (posteEnAttenteFin){
-      terminerPartie(posteEnAttenteFin, document.getElementById('modale-resultat').value);
+      if (fileTerminerGroupe.length > 0){
+        terminerPourChangement(posteEnAttenteFin, resultat);
+        fileTerminerGroupe.shift();
+        sauvegarder();
+        render();
+        if (fileTerminerGroupe.length > 0){
+          traiterProchainTerminerGroupe();
+          return;
+        }
+      } else {
+        terminerPartie(posteEnAttenteFin, resultat);
+      }
     }
     fermerModaleFin();
   });
