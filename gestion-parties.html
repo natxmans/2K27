@@ -436,6 +436,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script>
 (function(){
   const CLE_STOCKAGE = 'festival2k27_parties';
@@ -509,25 +510,13 @@
   function initEtat(){
     if (FIREBASE_ACTIF){
       firebase.initializeApp(FIREBASE_CONFIG);
-      firebaseRef = firebase.database().ref('festival2k27_etat');
-      firebaseRef.on('value', snapshot => {
-        const donnees = snapshot.val();
-        if (!donnees || !donnees.postes){
-          etat = etatParDefaut();
-          firebaseRef.set(etat);
-        } else {
-          etat = donnees;
-          // Firebase supprime les tableaux/valeurs vides (ex: historique: []) : on
-          // remet des valeurs par defaut pour ces champs s'ils sont absents du snapshot.
-          etat.historique = etat.historique || [];
-          etat.globalPauseActive = etat.globalPauseActive || false;
-          etat.globalPauseRaison = etat.globalPauseRaison || null;
-          etat.globalPausedIds = etat.globalPausedIds || [];
-        }
-        majBadgeConnexion('connecte');
-        render();
-      }, erreur => {
-        console.error(erreur);
+      // Connexion anonyme : sans ecran de connexion visible pour l'utilisatrice, mais
+      // empeche les lectures/ecritures "brutes" (ex: un simple appel curl) une fois que
+      // les regles Firebase exigent un compte authentifie (voir memoire du projet).
+      firebase.auth().signInAnonymously().then(() => {
+        demarrerEcouteFirebase();
+      }).catch(erreur => {
+        console.error('Echec connexion anonyme :', erreur);
         if (!etat) etat = chargerEtatLocal();
         majBadgeConnexion('erreur');
         render();
@@ -537,6 +526,32 @@
       majBadgeConnexion('solo');
       render();
     }
+  }
+
+  function demarrerEcouteFirebase(){
+    firebaseRef = firebase.database().ref('festival2k27_etat');
+    firebaseRef.on('value', snapshot => {
+      const donnees = snapshot.val();
+      if (!donnees || !donnees.postes){
+        etat = etatParDefaut();
+        firebaseRef.set(etat);
+      } else {
+        etat = donnees;
+        // Firebase supprime les tableaux/valeurs vides (ex: historique: []) : on
+        // remet des valeurs par defaut pour ces champs s'ils sont absents du snapshot.
+        etat.historique = etat.historique || [];
+        etat.globalPauseActive = etat.globalPauseActive || false;
+        etat.globalPauseRaison = etat.globalPauseRaison || null;
+        etat.globalPausedIds = etat.globalPausedIds || [];
+      }
+      majBadgeConnexion('connecte');
+      render();
+    }, erreur => {
+      console.error(erreur);
+      if (!etat) etat = chargerEtatLocal();
+      majBadgeConnexion('erreur');
+      render();
+    });
   }
 
   function sauvegarder(){
@@ -825,8 +840,8 @@
       contenuAction = `
         <div class="chrono">${formatDuree(elapsedPoste(poste))}</div>
         <div class="infos">
-          <strong>${poste.jeu || 'Jeu non précisé'}</strong><br>
-          ${poste.joueurs || 'Joueur(s) non précisé(s)'}
+          <strong>${escapeHtml(poste.jeu) || 'Jeu non précisé'}</strong><br>
+          ${escapeHtml(poste.joueurs) || 'Joueur(s) non précisé(s)'}
         </div>
         <div class="poste-actions">
           <button class="btn-pause">${poste.statut === 'pause' ? '▶ Reprendre' : '⏸ Pause'}</button>

@@ -152,6 +152,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script>
 (function(){
   const FIREBASE_CONFIG = {
@@ -208,13 +209,17 @@
   } else {
     try{
       firebase.initializeApp(FIREBASE_CONFIG);
-      const refPostes = firebase.database().ref('festival2k27_etat/postes');
-      refPostes.on('value', snapshot => {
-        const donnees = snapshot.val() || [];
-        const postes = Array.isArray(donnees) ? donnees : Object.values(donnees);
-        const poste = postes.find(p => p && p.nom && p.nom.trim().toLowerCase() === nomPoste.toLowerCase());
-        render(poste);
-      }, erreur => {
+      firebase.auth().signInAnonymously().then(() => {
+        const refPostes = firebase.database().ref('festival2k27_etat/postes');
+        refPostes.on('value', snapshot => {
+          const donnees = snapshot.val() || [];
+          const postes = Array.isArray(donnees) ? donnees : Object.values(donnees);
+          const poste = postes.find(p => p && p.nom && p.nom.trim().toLowerCase() === nomPoste.toLowerCase());
+          render(poste);
+        }, erreur => {
+          afficherErreur('Connexion impossible : ' + erreur.message);
+        });
+      }).catch(erreur => {
         afficherErreur('Connexion impossible : ' + erreur.message);
       });
     }catch(e){
